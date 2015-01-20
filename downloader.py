@@ -20,7 +20,7 @@ try:
     app.args.add_argument('-u', '--url', action='store', help='broadcast or highlight url')
     app.args.add_argument('-o', '--output', action='store', help='output folder for downloaded files', default='.')
     app.args.add_argument('-q', '--quality', action='store', help='desired stream quality', default='live')
-    app.args.add_argument('-n', '--name', action='store', help='name for the complete stream file', default='stream')
+    app.args.add_argument('-n', '--name', action='store', help='name for the complete stream file', default='')
     app.args.add_argument('-s', '--start', action='store', help='start time (in seconds) for new-type VODs', default=0)
     app.args.add_argument('-e', '--end', action='store', help='end time (in seconds) for new-type VODs', default=sys.maxint)
 
@@ -54,6 +54,9 @@ try:
         subdomain = match.get("subdomain")
         video_type = match.get("video_type")
         video_id = match.get("video_id")
+
+        if not app.pargs.name:
+            app.pargs.name = '%s_%s.mp4' % (channel, video_id)
 
         if video_type == 'b':
             video_type = 'a'
@@ -102,7 +105,7 @@ try:
                 position += seg.duration
          
                 # Check if we have gotten to the start of the clip
-                if position < app.pargs.start:
+                if position < int(app.pargs.start):
                     continue
          
                 # Extract clip name and byte range
@@ -116,7 +119,7 @@ try:
                     chunks[-1][2] = end_byte
          
                 # Check if we have reached the end of clip
-                if position > app.pargs.end:
+                if position > int(app.pargs.end):
                     break
          
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
