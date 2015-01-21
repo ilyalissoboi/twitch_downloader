@@ -72,13 +72,25 @@ try:
                 app.close(1)
 
             chunks = [c['url'] for c in api_response['chunks'][app.pargs.quality]]
+            chunk_names = []
 
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
-                first = True
-                for c in chunks:
-                    cf.write('%s\n' % c)
+                with open(os.path.join(app.pargs.output, 'demux.txt'), 'w+') as df:
+                    first = True
+                    for c in chunks:
+                        cf.write('%s\n' % c)
+                        df.write('file %s.%s\n' % (c.split('/')[-1].split('.')[0], 'mp4'))
+                        chunk_names.append(c.split('/')[-1].split('.')[0])
 
             subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
+            for c in chunk_names:
+                subprocess.check_call('ffmpeg -i %s.flv -vcodec copy -acodec copy %s.mp4' % (c, c), cwd=app.pargs.output, shell=True)
+            subprocess.check_call('ffmpeg -f concat -i demux.txt -c copy %s' % app.pargs.name, cwd=app.pargs.output, shell=True)
+
+            for c in chunk_names:
+                os.remove(os.path.join(app.pargs.output, '%s.flv' % c))
+                os.remove(os.path.join(app.pargs.output, '%s.mp4' % c))
+            os.remove(os.path.join(app.pargs.output, 'demux.txt'))
             os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
 
         elif video_type == 'v':

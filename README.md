@@ -1,7 +1,7 @@
 # twitch_downloader
 A universal [twitch.tv](http://www.twitch.tv) VOD download script. Compatible with both old- and new-style VODs. Uses some code from [Livestreamer](https://github.com/chrippa/livestreamer) as well as [this script](https://gist.github.com/EhsanKia/0330132521ee3c6caf7e). 
 
-Old-style VODs will be downloaded as 30-minute chunks, new-style VODs will be concatenated into a single file.
+All VODs will be concatenated into a single file, however old-style VODs may have problems with sound synchronization due to Twitch blocking copyrighted music.
 
 Requires:
 - [cement](https://pypi.python.org/pypi/cement/2.4.0)
