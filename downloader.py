@@ -56,7 +56,12 @@ try:
         video_id = match.get("video_id")
 
         if not app.pargs.name:
-            app.pargs.name = '%s_%s.mp4' % (channel, video_id)
+            if app.pargs.end:
+                app.pargs.name = '%s_%s_%s.mp4' % (channel, video_id, app.pargs.end)
+            if app.pargs.start and app.pargs.end:
+                app.pargs.name = '%s_%s_%s_%s.mp4' % (channel, video_id, app.pargs.start, app.pargs.end)
+            else:
+                app.pargs.name = '%s_%s.mp4' % (channel, video_id)
 
         if video_type == 'b':
             video_type = 'a'
