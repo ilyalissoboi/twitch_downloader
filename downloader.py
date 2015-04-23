@@ -1,3 +1,4 @@
+import math
 import m3u8
 import os
 import re
@@ -110,6 +111,11 @@ try:
 
             chunks = [c['url'] for c in api_response['chunks'][app.pargs.quality]]
             chunk_names = []
+
+            first_chunk = int(int(app.pargs.start) / 1800)
+            last_chunk = min(int(math.ceil(int(app.pargs.end) / 1800)), len(chunks))
+
+            chunks = chunks[first_chunk:last_chunk]
 
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
                 with open(os.path.join(app.pargs.output, 'demux.txt'), 'w+') as df:
