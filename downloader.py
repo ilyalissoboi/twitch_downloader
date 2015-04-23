@@ -12,7 +12,7 @@ from cement.utils.misc import init_defaults
 from pprint import pprint
 
 CLIENT_ID = 'qlj10cyuk2moe38hzmvsbd4zzvooe1o'
-REDIRECT_URL = 'https://github.com/ilyalissoboi/twitch_downloader/blob/master/authorization.md'
+REDIRECT_URL = 'https://ilyalissoboi.github.io/twitch_downloader/landing.html'
 
 defaults = init_defaults('twitch_downloader')
 defaults['twitch_downloader']['debug'] = False
