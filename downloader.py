@@ -19,8 +19,7 @@ defaults['twitch_downloader']['debug'] = False
 defaults['twitch_downloader']['url'] = None
 
 def authenticate_twitch_oauth():
-    """Opens a web browser to allow the user to grant Livestreamer
-       access to their Twitch account."""
+    """Opens a web browser to allow the user to grant the script access to their Twitch account."""
 
     url = ("https://api.twitch.tv/kraken/oauth2/authorize/"
            "?response_type=token&client_id={0}&redirect_uri="
@@ -76,7 +75,7 @@ try:
             )?
         """, re.VERBOSE)
 
-        #new API support
+        #new API specific variables
         _chunk_re = "(.+\.ts)\?start_offset=(\d+)&end_offset=(\d+)"
         _vod_api_url = "https://api.twitch.tv/api/vods/{}/access_token"
         _index_api_url = "http://usher.twitch.tv/vod/{}"
@@ -95,6 +94,7 @@ try:
             else:
                 app.pargs.name = '%s_%s.mp4' % (channel, video_id)
 
+        #old-style video
         if video_type == 'b':
             video_type = 'a'
 
@@ -105,6 +105,7 @@ try:
             api_response = requests.get(api_url, headers=api_headers).json()
             video_qualities = [q for q in api_response['chunks']]
 
+            #get chunks for selected quality
             if app.pargs.quality not in video_qualities:
                 app.log.error('Quality "%s" not available!' % app.pargs.quality)
                 app.close(1)
@@ -112,11 +113,13 @@ try:
             chunks = [c['url'] for c in api_response['chunks'][app.pargs.quality]]
             chunk_names = []
 
+            #approximate video chunks for selected clip duration
             first_chunk = int(int(app.pargs.start) / 1800)
             last_chunk = min(int(math.ceil(int(app.pargs.end) / 1800)), len(chunks))
 
             chunks = chunks[first_chunk:last_chunk]
 
+            #list files for download and merge
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
                 with open(os.path.join(app.pargs.output, 'demux.txt'), 'w+') as df:
                     first = True
@@ -125,6 +128,7 @@ try:
                         df.write('file %s.%s\n' % (c.split('/')[-1].split('.')[0], 'mp4'))
                         chunk_names.append(c.split('/')[-1].split('.')[0])
 
+            #download chunks, convert to mp4 and merge into single file
             subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
             for c in chunk_names:
                 subprocess.check_call('ffmpeg -i %s.flv -vcodec copy -acodec copy %s.mp4' % (c, c), cwd=app.pargs.output, shell=True)
@@ -136,6 +140,7 @@ try:
             os.remove(os.path.join(app.pargs.output, 'demux.txt'))
             os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
 
+        #new-style video
         elif video_type == 'v':
             # Get access code
             url = _vod_api_url.format(video_id)
@@ -177,6 +182,7 @@ try:
                 if position > int(app.pargs.end):
                     break
          
+            #download clip chunks and merge into single file
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
                 file_names = []
                 first = True
@@ -188,6 +194,7 @@ try:
             subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)   
             subprocess.check_call('ffmpeg -i "concat:%s" -bsf:a aac_adtstoasc -c copy %s' % ('|'.join(file_names), app.pargs.name), cwd=app.pargs.output, shell=True)
 
+            #clean up leftover files
             for c in chunks:
                 os.remove(os.path.join(app.pargs.output, c[0].split('/')[-1]))
             os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
