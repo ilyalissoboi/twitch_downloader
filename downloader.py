@@ -122,7 +122,6 @@ try:
             #list files for download and merge
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
                 with open(os.path.join(app.pargs.output, 'demux.txt'), 'w+') as df:
-                    first = True
                     for c in chunks:
                         cf.write('%s\n' % c)
                         df.write('file %s.%s\n' % (c.split('/')[-1].split('.')[0], 'mp4'))
@@ -151,7 +150,6 @@ try:
             url = _index_api_url.format(video_id)
             payload = {'nauth': data['token'], 'nauthsig': data['sig']}
             r = requests.get(url, params=payload, headers=common_headers)
-         
             m = m3u8.loads(r.content)
             index_url = m.playlists[0].uri
             index = m3u8.load(index_url)
@@ -185,7 +183,6 @@ try:
             #download clip chunks and merge into single file
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
                 file_names = []
-                first = True
                 for c in chunks:
                     video_url = "{}?start_offset={}&end_offset={}".format(*c)
                     file_names.append(c[0].split('/')[-1])
