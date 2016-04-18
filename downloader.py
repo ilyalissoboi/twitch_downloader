@@ -78,7 +78,7 @@ try:
         #new API specific variables
         _chunk_re = "(.+\.ts)\?start_offset=(\d+)&end_offset=(\d+)"
         _vod_api_url = "https://api.twitch.tv/api/vods/{}/access_token"
-        _index_api_url = "http://usher.twitch.tv/vod/{}"
+        _index_api_url = "http://usher.ttvnw.net/vod/{}"
 
         match = _url_re.match(app.pargs.url).groupdict()
         channel = match.get("channel").lower()
@@ -148,7 +148,7 @@ try:
          
             # Fetch vod index
             url = _index_api_url.format(video_id)
-            payload = {'nauth': data['token'], 'nauthsig': data['sig']}
+            payload = {'nauth': data['token'], 'nauthsig': data['sig'], 'allow_source': True, 'allow_spectre': True}
             r = requests.get(url, params=payload, headers=common_headers)
             m = m3u8.loads(r.content)
             index_url = m.playlists[0].uri
