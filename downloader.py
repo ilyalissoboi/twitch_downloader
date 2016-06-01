@@ -18,6 +18,11 @@ defaults = init_defaults('twitch_downloader')
 defaults['twitch_downloader']['debug'] = False
 defaults['twitch_downloader']['url'] = None
 
+def chunk_list(l, n):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(l), n):
+        yield l[i:i+n]
+
 def authenticate_twitch_oauth():
     """Opens a web browser to allow the user to grant the script access to their Twitch account."""
 
@@ -196,13 +201,33 @@ try:
                     file_names.append(c[0].split('/')[-1])
                     cf.write('%s\n' % video_url)
 
-            subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)   
-            subprocess.check_call('ffmpeg -i "concat:%s" -bsf:a aac_adtstoasc -c copy %s' % ('|'.join(file_names), app.pargs.name), cwd=app.pargs.output, shell=True)
+            subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
+
+            # handle cases where transport stream chunks are too short and numerous
+            temp_file_names = []
+            if len(file_names) > 200:
+                current_chunk_index = 0
+                for file_list_chunk in chunk_list(file_names, 200):
+                    temp_file_name = '%s_temp_%s_%s.mp4' % (app.pargs.name.split('.')[0], current_chunk_index, current_chunk_index + len(file_list_chunk))
+                    temp_file_names.append(temp_file_name)
+                    subprocess.check_call('ffmpeg -i "concat:%s" -bsf:a aac_adtstoasc -c copy %s' % ('|'.join(file_list_chunk), temp_file_name), cwd=app.pargs.output, shell=True)
+                    current_chunk_index += len(file_list_chunk)
+                with open(os.path.join(app.pargs.output, 'temp_file_chunks.txt'), 'w+') as cf:
+                    for fn in temp_file_names:
+                        cf.write("file '%s'\n" % os.path.join(app.pargs.output, fn))
+                subprocess.check_call('ffmpeg -f concat -i temp_file_chunks.txt -c copy %s' % (app.pargs.name), cwd=app.pargs.output, shell=True)
+                os.remove(os.path.join(app.pargs.output, 'temp_file_chunks.txt'))
+            # normal scenario for combining transport stream chunks
+            else:
+                subprocess.check_call('ffmpeg -i "concat:%s" -bsf:a aac_adtstoasc -c copy %s' % ('|'.join(file_names), app.pargs.name), cwd=app.pargs.output, shell=True)
 
             #clean up leftover files
-            for c in chunks:
-                os.remove(os.path.join(app.pargs.output, c[0].split('/')[-1]))
+            for f in file_names:
+                os.remove(os.path.join(app.pargs.output, f))
+            for f in temp_file_names:
+                os.remove(os.path.join(app.pargs.output, f))
             os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
+
 
     else:
         app.log.error("Did not receive a value for 'url' option.")
