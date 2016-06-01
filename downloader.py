@@ -77,6 +77,7 @@ try:
 
         #new API specific variables
         _chunk_re = "(.+\.ts)\?start_offset=(\d+)&end_offset=(\d+)"
+        _simple_chunk_re = "(.+\.ts)"
         _vod_api_url = "https://api.twitch.tv/api/vods/{}/access_token"
         _index_api_url = "http://usher.ttvnw.net/vod/{}"
 
@@ -168,7 +169,14 @@ try:
          
                 # Extract clip name and byte range
                 p = re.match(_chunk_re, seg.absolute_uri)
-                filename, start_byte, end_byte = p.groups()
+                # match for playlists without byte offsets
+                if not p:
+                    p = re.match(_simple_chunk_re, seg.absolute_uri)
+                    filename = p.groups()[0]
+                    start_byte = 0
+                    end_byte = 0
+                else:
+                    filename, start_byte, end_byte = p.groups()
          
                 # If we have a new file, add it tot he list
                 if not chunks or chunks[-1][0] != filename:
