@@ -215,7 +215,7 @@ try:
                 with open(os.path.join(app.pargs.output, 'temp_file_chunks.txt'), 'w+') as cf:
                     for fn in temp_file_names:
                         cf.write("file '%s'\n" % os.path.join(app.pargs.output, fn))
-                subprocess.check_call('ffmpeg -f concat -i temp_file_chunks.txt -c copy %s' % (app.pargs.name), cwd=app.pargs.output, shell=True)
+                subprocess.check_call('ffmpeg -f concat -safe 0 -i temp_file_chunks.txt -c copy %s' % (app.pargs.name), cwd=app.pargs.output, shell=True)
                 os.remove(os.path.join(app.pargs.output, 'temp_file_chunks.txt'))
             # normal scenario for combining transport stream chunks
             else:
@@ -233,6 +233,8 @@ try:
         app.log.error("Did not receive a value for 'url' option.")
         app.close(1)
 except Exception, e:
+    import traceback
+    traceback.print_exc(file=sys.stdout)
     raise e
 finally:
     app.close()

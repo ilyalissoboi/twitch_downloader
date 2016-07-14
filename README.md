@@ -5,7 +5,7 @@ All VODs will be concatenated into a single file, however old-style VODs may hav
 
 Requires:
 - [cement](https://pypi.python.org/pypi/cement/2.4.0)
-- [m3u8](https://pypi.python.org/pypi/m3u8/0.2.2)
+- [m3u8](https://github.com/ilyalissoboi/m3u8)
 - [requests](https://pypi.python.org/pypi/requests)
 - [aria2](http://aria2.sourceforge.net/)
 - [FFmpeg](https://www.ffmpeg.org/)
