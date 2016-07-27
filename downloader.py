@@ -10,6 +10,7 @@ import webbrowser
 from cement.core import foundation, hook
 from cement.utils.misc import init_defaults
 from pprint import pprint
+from random import random
 
 CLIENT_ID = 'qlj10cyuk2moe38hzmvsbd4zzvooe1o'
 REDIRECT_URL = 'https://ilyalissoboi.github.io/twitch_downloader/landing.html'
@@ -134,7 +135,7 @@ try:
                         chunk_names.append(c.split('/')[-1].split('.')[0])
 
             #download chunks, convert to mp4 and merge into single file
-            subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
+            subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none ', '--auto-file-renaming=false', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
             for c in chunk_names:
                 subprocess.check_call('ffmpeg -i %s.flv -vcodec copy -acodec copy %s.mp4' % (c, c), cwd=app.pargs.output, shell=True)
             subprocess.check_call('ffmpeg -f concat -i demux.txt -c copy %s' % app.pargs.name, cwd=app.pargs.output, shell=True)
@@ -154,7 +155,7 @@ try:
          
             # Fetch vod index
             url = _index_api_url.format(video_id)
-            payload = {'nauth': data['token'], 'nauthsig': data['sig'], 'allow_source': True, 'allow_spectre': True}
+            payload = {'nauth': data['token'], 'nauthsig': data['sig'], 'allow_source': True, 'allow_spectre': False, "player": "twitchweb", "p": int(random() * 999999), "allow_audio_only": True, "type": "any"}
             r = requests.get(url, params=payload, headers=common_headers)
             m = m3u8.loads(r.content)
             index_url = m.playlists[0].uri
@@ -184,10 +185,12 @@ try:
                     filename, start_byte, end_byte = p.groups()
          
                 # If we have a new file, add it tot he list
-                if not chunks or chunks[-1][0] != filename:
-                    chunks.append([filename, start_byte, end_byte])
-                else: # Else, update the end byte
-                    chunks[-1][2] = end_byte
+                # if not chunks or chunks[-1][0] != filename:
+                #     chunks.append([filename, start_byte, end_byte])
+                # else: # Else, update the end byte
+                #     chunks[-1][2] = end_byte
+
+                chunks.append([filename, start_byte, end_byte])
          
                 # Check if we have reached the end of clip
                 if position > int(app.pargs.end):
@@ -196,9 +199,16 @@ try:
             #download clip chunks and merge into single file
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
                 file_names = []
+                file_segment_no = 1
                 for c in chunks:
                     video_url = "{}?start_offset={}&end_offset={}".format(*c)
-                    file_names.append(c[0].split('/')[-1])
+                    file_name = c[0].split('/')[-1]
+                    if file_names and file_name in file_names[-1]:
+                        file_name = '%s.%s' % (file_name, str(file_segment_no))
+                        file_segment_no += 1
+                    else:
+                        file_segment_no = 1
+                    file_names.append(file_name)
                     cf.write('%s\n' % video_url)
 
             subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
