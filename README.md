@@ -7,7 +7,7 @@ Requires:
 - [cement](https://pypi.python.org/pypi/cement/2.4.0)
 - [m3u8](https://github.com/ilyalissoboi/m3u8)
 - [requests](https://pypi.python.org/pypi/requests)
-- [aria2](http://aria2.sourceforge.net/)
+- [wget](https://www.gnu.org/software/wget/)
 - [FFmpeg](https://www.ffmpeg.org/)
 
 #Usage
