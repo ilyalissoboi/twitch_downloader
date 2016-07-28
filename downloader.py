@@ -135,7 +135,7 @@ try:
                         chunk_names.append(c.split('/')[-1].split('.')[0])
 
             #download chunks, convert to mp4 and merge into single file
-            subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none ', '--auto-file-renaming=false', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
+            subprocess.check_call('wget -i %s -nv' % os.path.join(app.pargs.output, 'chunks.txt'), cwd=app.pargs.output, shell=True)
             for c in chunk_names:
                 subprocess.check_call('ffmpeg -i %s.flv -vcodec copy -acodec copy %s.mp4' % (c, c), cwd=app.pargs.output, shell=True)
             subprocess.check_call('ffmpeg -f concat -i demux.txt -c copy %s' % app.pargs.name, cwd=app.pargs.output, shell=True)
@@ -183,12 +183,6 @@ try:
                     end_byte = 0
                 else:
                     filename, start_byte, end_byte = p.groups()
-         
-                # If we have a new file, add it tot he list
-                # if not chunks or chunks[-1][0] != filename:
-                #     chunks.append([filename, start_byte, end_byte])
-                # else: # Else, update the end byte
-                #     chunks[-1][2] = end_byte
 
                 chunks.append([filename, start_byte, end_byte])
          
@@ -198,44 +192,13 @@ try:
          
             #download clip chunks and merge into single file
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
-                file_names = []
-                file_segment_no = 1
                 for c in chunks:
                     video_url = "{}?start_offset={}&end_offset={}".format(*c)
-                    file_name = c[0].split('/')[-1]
-                    if file_names and file_name in file_names[-1]:
-                        file_name = '%s.%s' % (file_name, str(file_segment_no))
-                        file_segment_no += 1
-                    else:
-                        file_segment_no = 1
-                    file_names.append(file_name)
                     cf.write('%s\n' % video_url)
 
-            subprocess.check_call(['aria2c', '-x 10', '--file-allocation=none', '-i %s' % os.path.join(app.pargs.output, 'chunks.txt')], cwd=app.pargs.output)
-
-            # handle cases where transport stream chunks are too short and numerous
-            temp_file_names = []
-            if len(file_names) > 200:
-                current_chunk_index = 0
-                for file_list_chunk in chunk_list(file_names, 200):
-                    temp_file_name = '%s_temp_%s_%s.mp4' % (app.pargs.name.split('.')[0], current_chunk_index, current_chunk_index + len(file_list_chunk))
-                    temp_file_names.append(temp_file_name)
-                    subprocess.check_call('ffmpeg -i "concat:%s" -bsf:a aac_adtstoasc -c copy %s' % ('|'.join(file_list_chunk), temp_file_name), cwd=app.pargs.output, shell=True)
-                    current_chunk_index += len(file_list_chunk)
-                with open(os.path.join(app.pargs.output, 'temp_file_chunks.txt'), 'w+') as cf:
-                    for fn in temp_file_names:
-                        cf.write("file '%s'\n" % os.path.join(app.pargs.output, fn))
-                subprocess.check_call('ffmpeg -f concat -safe 0 -i temp_file_chunks.txt -c copy %s' % (app.pargs.name), cwd=app.pargs.output, shell=True)
-                os.remove(os.path.join(app.pargs.output, 'temp_file_chunks.txt'))
-            # normal scenario for combining transport stream chunks
-            else:
-                subprocess.check_call('ffmpeg -i "concat:%s" -bsf:a aac_adtstoasc -c copy %s' % ('|'.join(file_names), app.pargs.name), cwd=app.pargs.output, shell=True)
-
-            #clean up leftover files
-            for f in file_names:
-                os.remove(os.path.join(app.pargs.output, f))
-            for f in temp_file_names:
-                os.remove(os.path.join(app.pargs.output, f))
+            transport_stream_file_name = app.pargs.name.replace('.mp4', '.ts')
+            subprocess.check_call('wget -i %s -nv -O %s' % (os.path.join(app.pargs.output, 'chunks.txt'), transport_stream_file_name), cwd=app.pargs.output, shell=True)
+            subprocess.check_call('ffmpeg -i %s -bsf:a aac_adtstoasc -c copy %s' % (transport_stream_file_name, app.pargs.name), cwd=app.pargs.output, shell=True)
             os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
 
 
