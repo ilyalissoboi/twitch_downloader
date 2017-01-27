@@ -71,14 +71,8 @@ try:
                 \.
             )?
             twitch.tv
-            /
-            (?P<channel>[^/]+)
-            (?:
-                /
-                (?P<video_type>[bcv])
-                /
-                (?P<video_id>\d+)
-            )?
+            /videos/
+                (?P<video_id>\d+)?
         """, re.VERBOSE)
 
         #new API specific variables
@@ -88,9 +82,10 @@ try:
         _index_api_url = "http://usher.ttvnw.net/vod/{}"
 
         match = _url_re.match(app.pargs.url).groupdict()
-        channel = match.get("channel").lower()
+
+        channel = match.get("channel", "twitch").lower()
         subdomain = match.get("subdomain")
-        video_type = match.get("video_type")
+        video_type = match.get("video_type", "v")
         video_id = match.get("video_id")
 
         if not app.pargs.name:
@@ -189,6 +184,10 @@ try:
                 # Check if we have reached the end of clip
                 if position > int(app.pargs.end):
                     break
+
+            if channel == 'twitch':
+                channel = chunks[0][0].split('chunked')[0].strip('/').split('/')[-1].split('_')[1]
+                app.pargs.name = app.pargs.name.replace('twitch', channel)
          
             #download clip chunks and merge into single file
             with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
@@ -200,8 +199,7 @@ try:
             subprocess.check_call('wget -i %s -nv -O %s' % (os.path.join(app.pargs.output, 'chunks.txt'), transport_stream_file_name), cwd=app.pargs.output, shell=True)
             subprocess.check_call('ffmpeg -i %s -bsf:a aac_adtstoasc -c copy %s' % (transport_stream_file_name, app.pargs.name), cwd=app.pargs.output, shell=True)
             os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
-
-
+            os.remove(os.path.join(app.pargs.output, transport_stream_file_name))
     else:
         app.log.error("Did not receive a value for 'url' option.")
         app.close(1)
