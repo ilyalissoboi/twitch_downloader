@@ -60,7 +60,7 @@ try:
 
     try:
         common_headers = {'Authorization': 'OAuth %s' % open(os.path.expanduser('~/.twitch_token')).readline()}
-    except Exception, e:
+    except Exception as e:
         common_headers = {}
 
     if app.pargs.url:
@@ -88,118 +88,84 @@ try:
         video_type = match.get("video_type", "v")
         video_id = match.get("video_id")
 
+        output_file_name = ''
+
         if not app.pargs.name:
             if app.pargs.end:
-                app.pargs.name = '%s_%s_%s.mp4' % (channel, video_id, app.pargs.end)
+                output_file_name = '%s_%s_%s.mp4' % (channel, video_id, app.pargs.end)
             if app.pargs.start and app.pargs.end:
-                app.pargs.name = '%s_%s_%s_%s.mp4' % (channel, video_id, app.pargs.start, app.pargs.end)
+                output_file_name = '%s_%s_%s_%s.mp4' % (channel, video_id, app.pargs.start, app.pargs.end)
             else:
-                app.pargs.name = '%s_%s.mp4' % (channel, video_id)
+                output_file_name = '%s_%s.mp4' % (channel, video_id)
+        else:
+            if app.pargs.end:
+                output_file_name = '%s_%s_%s.mp4' % (app.pargs.name, video_id, app.pargs.end)
+            if app.pargs.start and app.pargs.end:
+                output_file_name = '%s_%s_%s_%s.mp4' % (app.pargs.name, video_id, app.pargs.start, app.pargs.end)
+            else:
+                output_file_name = '%s_%s.mp4' % (app.pargs.name, video_id)
 
-        #old-style video
-        if video_type == 'b':
-            video_type = 'a'
+        app.pargs.name = output_file_name
 
-            api_url = 'https://api.twitch.tv/api/videos/%s%s/' %(video_type, video_id)
-            api_headers = {'Accept': 'application/vnd.twitchtv.v2+json'}
-            api_headers.update(common_headers)
+        assert video_type == 'v'
 
-            api_response = requests.get(api_url, headers=api_headers).json()
-            video_qualities = [q for q in api_response['chunks']]
+        # Get access code
+        url = _vod_api_url.format(video_id)
+        r = requests.get(url, headers=common_headers)
+        data = r.json()
 
-            #get chunks for selected quality
-            if app.pargs.quality not in video_qualities:
-                app.log.error('Quality "%s" not available!' % app.pargs.quality)
-                app.close(1)
+        # Fetch vod index
+        url = _index_api_url.format(video_id)
+        payload = {'nauth': data['token'], 'nauthsig': data['sig'], 'allow_source': True, 'allow_spectre': False, "player": "twitchweb", "p": int(random() * 999999), "allow_audio_only": True, "type": "any"}
+        r = requests.get(url, params=payload, headers=common_headers)
+        m = m3u8.loads(r.content)
+        index_url = m.playlists[0].uri
+        index = m3u8.load(index_url)
 
-            chunks = [c['url'] for c in api_response['chunks'][app.pargs.quality]]
-            chunk_names = []
+        # Get the piece we need
+        position = 0
+        chunks = []
 
-            #approximate video chunks for selected clip duration
-            first_chunk = int(int(app.pargs.start) / 1800)
-            last_chunk = min(int(math.ceil(int(app.pargs.end) / 1800)), len(chunks))
+        for seg in index.segments:
+            # Add duration of current segment
+            position += seg.duration
 
-            chunks = chunks[first_chunk:last_chunk]
+            # Check if we have gotten to the start of the clip
+            if position < int(app.pargs.start):
+                continue
 
-            #list files for download and merge
-            with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
-                with open(os.path.join(app.pargs.output, 'demux.txt'), 'w+') as df:
-                    for c in chunks:
-                        cf.write('%s\n' % c)
-                        df.write('file %s.%s\n' % (c.split('/')[-1].split('.')[0], 'mp4'))
-                        chunk_names.append(c.split('/')[-1].split('.')[0])
+            # Extract clip name and byte range
+            p = re.match(_chunk_re, seg.absolute_uri)
+            # match for playlists without byte offsets
+            if not p:
+                p = re.match(_simple_chunk_re, seg.absolute_uri)
+                filename = p.groups()[0]
+                start_byte = 0
+                end_byte = 0
+            else:
+                filename, start_byte, end_byte = p.groups()
 
-            #download chunks, convert to mp4 and merge into single file
-            subprocess.check_call('wget -i %s -nv' % os.path.join(app.pargs.output, 'chunks.txt'), cwd=app.pargs.output, shell=True)
-            for c in chunk_names:
-                subprocess.check_call('ffmpeg -i %s.flv -vcodec copy -acodec copy %s.mp4' % (c, c), cwd=app.pargs.output, shell=True)
-            subprocess.check_call('ffmpeg -f concat -i demux.txt -c copy %s' % app.pargs.name, cwd=app.pargs.output, shell=True)
+            chunks.append([filename, start_byte, end_byte])
 
-            for c in chunk_names:
-                os.remove(os.path.join(app.pargs.output, '%s.flv' % c))
-                os.remove(os.path.join(app.pargs.output, '%s.mp4' % c))
-            os.remove(os.path.join(app.pargs.output, 'demux.txt'))
-            os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
+            # Check if we have reached the end of clip
+            if position > int(app.pargs.end):
+                break
 
-        #new-style video
-        elif video_type == 'v':
-            # Get access code
-            url = _vod_api_url.format(video_id)
-            r = requests.get(url, headers=common_headers)
-            data = r.json()
-         
-            # Fetch vod index
-            url = _index_api_url.format(video_id)
-            payload = {'nauth': data['token'], 'nauthsig': data['sig'], 'allow_source': True, 'allow_spectre': False, "player": "twitchweb", "p": int(random() * 999999), "allow_audio_only": True, "type": "any"}
-            r = requests.get(url, params=payload, headers=common_headers)
-            m = m3u8.loads(r.content)
-            index_url = m.playlists[0].uri
-            index = m3u8.load(index_url)
+        if channel == 'twitch':
+            channel = chunks[0][0].split('chunked')[0].strip('/').split('/')[-1].split('_')[1]
+            app.pargs.name = app.pargs.name.replace('twitch', channel)
 
-            # Get the piece we need
-            position = 0
-            chunks = []
-         
-            for seg in index.segments:
-                # Add duration of current segment
-                position += seg.duration
-         
-                # Check if we have gotten to the start of the clip
-                if position < int(app.pargs.start):
-                    continue
-         
-                # Extract clip name and byte range
-                p = re.match(_chunk_re, seg.absolute_uri)
-                # match for playlists without byte offsets
-                if not p:
-                    p = re.match(_simple_chunk_re, seg.absolute_uri)
-                    filename = p.groups()[0]
-                    start_byte = 0
-                    end_byte = 0
-                else:
-                    filename, start_byte, end_byte = p.groups()
+        #download clip chunks and merge into single file
+        with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
+            for c in chunks:
+                video_url = "{}?start_offset={}&end_offset={}".format(*c)
+                cf.write('%s\n' % video_url)
 
-                chunks.append([filename, start_byte, end_byte])
-         
-                # Check if we have reached the end of clip
-                if position > int(app.pargs.end):
-                    break
-
-            if channel == 'twitch':
-                channel = chunks[0][0].split('chunked')[0].strip('/').split('/')[-1].split('_')[1]
-                app.pargs.name = app.pargs.name.replace('twitch', channel)
-         
-            #download clip chunks and merge into single file
-            with open(os.path.join(app.pargs.output, 'chunks.txt'), 'w+') as cf:
-                for c in chunks:
-                    video_url = "{}?start_offset={}&end_offset={}".format(*c)
-                    cf.write('%s\n' % video_url)
-
-            transport_stream_file_name = app.pargs.name.replace('.mp4', '.ts')
-            subprocess.check_call('wget -i %s -nv -O %s' % (os.path.join(app.pargs.output, 'chunks.txt'), transport_stream_file_name), cwd=app.pargs.output, shell=True)
-            subprocess.check_call('ffmpeg -i %s -bsf:a aac_adtstoasc -c copy %s' % (transport_stream_file_name, app.pargs.name), cwd=app.pargs.output, shell=True)
-            os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
-            os.remove(os.path.join(app.pargs.output, transport_stream_file_name))
+        transport_stream_file_name = app.pargs.name.replace('.mp4', '.ts')
+        subprocess.call('wget -i %s -nv -O %s' % (os.path.join(app.pargs.output, 'chunks.txt'), transport_stream_file_name), cwd=app.pargs.output, shell=True)
+        subprocess.call('ffmpeg -i %s -bsf:a aac_adtstoasc -c copy %s' % (transport_stream_file_name, app.pargs.name), cwd=app.pargs.output, shell=True)
+        os.remove(os.path.join(app.pargs.output, 'chunks.txt'))
+        os.remove(os.path.join(app.pargs.output, transport_stream_file_name))
     else:
         app.log.error("Did not receive a value for 'url' option.")
         app.close(1)
