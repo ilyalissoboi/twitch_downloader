@@ -59,9 +59,12 @@ try:
         sys.exit(0)
 
     try:
-        common_headers = {'Authorization': 'OAuth %s' % open(os.path.expanduser('~/.twitch_token')).readline()}
+        common_headers = {
+            'Authorization': 'OAuth %s' % open(os.path.expanduser('~/.twitch_token')).readline().rstrip('\n'),
+            'Client-ID': 'qlj10cyuk2moe38hzmvsbd4zzvooe1o'
+            }
     except Exception as e:
-        common_headers = {}
+        common_headers = {'Client-ID': 'qlj10cyuk2moe38hzmvsbd4zzvooe1o'}
 
     if app.pargs.url:
         _url_re = re.compile(r"""
