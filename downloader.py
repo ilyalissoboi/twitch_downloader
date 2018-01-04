@@ -61,10 +61,10 @@ try:
     try:
         common_headers = {
             'Authorization': 'OAuth %s' % open(os.path.expanduser('~/.twitch_token')).readline().rstrip('\n'),
-            'Client-ID': 'qlj10cyuk2moe38hzmvsbd4zzvooe1o'
+            'Client-ID': CLIENT_ID
             }
     except Exception as e:
-        common_headers = {'Client-ID': 'qlj10cyuk2moe38hzmvsbd4zzvooe1o'}
+        common_headers = {'Client-ID': CLIENT_ID}
 
     if app.pargs.url:
         _url_re = re.compile(r"""
